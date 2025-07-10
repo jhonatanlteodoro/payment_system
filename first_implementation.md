@@ -49,7 +49,7 @@ payload: {"message": "the coffee machine died for some reason, try again in the 
 
 ```
 
-# Server Initial Tech Specs [This most likelly to be changed in future versions]
+# Server Initial Tech Specs [This will most likely be changed in future versions]
 
 - Lang: Go 1.24
 - DB: Pgsql
