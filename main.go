@@ -2,14 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/shopspring/decimal"
 	"html"
 	"log"
 	"net/http"
 	"os"
-	"time"
 )
 
 var dbConn *pgx.Conn
@@ -64,28 +64,6 @@ func ConnectDB(ctx context.Context) {
 	}
 }
 
-type Transaction struct {
-	ID          string
-	FromAccount string
-	ToAccount   string
-	Amount      decimal.Decimal
-	Description string
-	CreatedAt   time.Time
-}
-
-type Account struct {
-	ID        string
-	CreatedAt time.Time
-}
-
-type Balance struct {
-	ID        string
-	AccountID string
-	Amount    decimal.Decimal
-	CreatedAt time.Time
-	UpdatedAt time.Time
-}
-
 func main() {
 	ctx := context.Background()
 	ConnectDB(ctx)
@@ -96,6 +74,75 @@ func main() {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
+
+		data := &Transaction{}
+		if err := json.NewDecoder(r.Body).Decode(data); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		fmt.Println("Amount ", data.Amount.String())
+
+		balanceFromAccountQuery := `
+			SELECT amount FROM balances WHERE account_id=$1 LIMIT 1;
+		`
+
+		balanceFromAccount := &Balance{}
+		if err := dbConn.QueryRow(ctx, balanceFromAccountQuery, data.FromAccount).Scan(
+			&balanceFromAccount.Amount,
+		); err != nil {
+			http.Error(w, "Unable to query database", http.StatusInternalServerError)
+			return
+		}
+
+		fmt.Println("Balance: ", balanceFromAccount.Amount.String())
+
+		balanceToAccountQuery := `
+			SELECT amount FROM balances WHERE account_id=$1 LIMIT 1;
+		`
+
+		balanceToAccount := &Balance{}
+		if err := dbConn.QueryRow(ctx, balanceToAccountQuery, data.ToAccount).Scan(
+			&balanceToAccount.Amount,
+		); err != nil {
+			http.Error(w, "Unable to query database", http.StatusInternalServerError)
+			return
+		}
+
+		fmt.Println("Balance: ", balanceToAccount.Amount.String())
+
+		id, err := uuid.NewV7()
+		if err != nil {
+			http.Error(w, "Unable to generate UUID", http.StatusInternalServerError)
+			return
+		}
+
+		query := `
+			INSERT INTO transactions (id, from_account_id, to_account_id, amount, description) VALUES ($1, $2, $3, $4, $5);
+		`
+		if _, err := dbConn.Exec(ctx, query, id.String(), data.FromAccount, data.ToAccount, &data.Amount, data.Description); err != nil {
+			log.Printf("query failed: %v\n", err)
+			http.Error(w, "Unable to insert transaction", http.StatusInternalServerError)
+			return
+		}
+
+		fromAccountNewBalanceQuery := `
+        	UPDATE balances SET amount=$2 where account_id=$1;
+        `
+		newBalance := balanceFromAccount.Amount.Sub(data.Amount.Decimal)
+		if _, err = dbConn.Exec(ctx, fromAccountNewBalanceQuery, data.FromAccount, &newBalance); err != nil {
+			log.Printf("query failed: %v\n", err)
+			http.Error(w, "Unable to insert transaction", http.StatusInternalServerError)
+			return
+		}
+
+		newBalanceToAccount := balanceToAccount.Amount.Add(data.Amount.Decimal)
+		if _, err = dbConn.Exec(ctx, fromAccountNewBalanceQuery, data.ToAccount, &newBalanceToAccount); err != nil {
+			log.Printf("query failed: %v\n", err)
+			http.Error(w, "Unable to insert transaction", http.StatusInternalServerError)
+			return
+		}
+
 		fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
 	})
 
