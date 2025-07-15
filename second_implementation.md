@@ -42,3 +42,8 @@ Q&A:
 - Q: Why use redis for a distributed lock manager?
  - - A: At this point we could use the PostgreSQL to handle this job for us but this will translate to more job for our little baby that will need to handle a bunch of things already,
      So, the other alternatives that I know either would require the redis Or something like zookeeper, but since I never touched zookeeper I will stick with a cheap redis.
+
+
+Deps:
+- Gin [Why? I spend 2+ years using fasthttp which will be a best option for performance purposes but i want to play with Gin :)]
+- Cobra [Why? At least for now is best CMD library that I know, easy to use and pretty flexible]
