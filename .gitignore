@@ -31,6 +31,6 @@ go.work.sum
  .idea/
  .vscode/
 
- db_data/*
- rabbitmq_data/*
+ db_data/
+ rabbitmq_data/
 
