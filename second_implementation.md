@@ -47,3 +47,5 @@ Q&A:
 Deps:
 - Gin [Why? I spend 2+ years using fasthttp which will be a best option for performance purposes but i want to play with Gin :)]
 - Cobra [Why? At least for now is best CMD library that I know, easy to use and pretty flexible]
+- env [Why? even dough we already had viper in this project I hate viper env embed struct definition, too dirty for me, feel free to use whatever you want]
+- amqp091-go [Why? seems to be the most trustable lib available for rabbitmq, still has a few limitations and constraints but im planning to implement a few extensions for learning purposes in the near future]

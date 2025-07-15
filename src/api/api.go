@@ -30,7 +30,6 @@ func StartApiServer(serverDown chan os.Signal) {
 	}()
 
 	<-serverDown
-
 	log.Println("Server is shutting down...")
 	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
 	defer cancel()

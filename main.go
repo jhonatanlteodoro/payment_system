@@ -1,14 +1,14 @@
 package main
 
 import (
-	"github.com/jackc/pgx/v5"
 	"github.com/jhonatanlteodoro/payment_system/src/cmd"
+	"github.com/jhonatanlteodoro/payment_system/src/shared_deps"
 	"os"
 	"os/signal"
 	"syscall"
 )
 
-var dbConn *pgx.Conn
+//var dbConn *pgx.Conn
 
 //func ConnectDB(ctx context.Context) {
 //	dbUrl := "postgres://secret_user:secret_password@localhost:5432/payment"
@@ -63,6 +63,8 @@ var dbConn *pgx.Conn
 func main() {
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+
+	shared_deps.NewSharedDependencies(shutdown)
 
 	cmd.Execute(shutdown)
 	//ctx := context.Background()
