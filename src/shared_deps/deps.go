@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/caarlos0/env/v11"
 	"github.com/jackc/pgx/v5"
+	"github.com/jhonatanlteodoro/payment_system/src/ports"
 	"log"
 	"os"
 	"sync"
@@ -28,6 +29,10 @@ type envs struct {
 	RabbitMqPass string `env:"RABBITMQ_PASS" envDefault:"secret_password"`
 	RabbitMqHost string `env:"RABBITMQ_HOST" envDefault:"localhost"`
 	RabbitMqPort string `env:"RABBITMQ_PORT" envDefault:"5672"`
+
+	StartPaymentQueueName   string `env:"START_PAYMENT_QUEUE_NAME" envDefault:"start-payment"`
+	ProcessPaymentQueueName string `env:"PROCESS_PAYMENT_QUEUE_NAME" envDefault:"process-payment"`
+	NotifyUserQueueName     string `env:"NOTIFY_USER_QUEUE_NAME" envDefault:"notify-user"`
 }
 
 // SharedDeps are intended to hold env vars and shared items [db connections, clients, and etc...]
@@ -36,6 +41,11 @@ type SharedDeps struct {
 
 	PaymentsDBConn *pgx.Conn
 	RabbitMqConn   *amqp.Connection
+
+	//Queues
+	StartPaymentQueue   ports.Queue
+	ProcessPaymentQueue ports.Queue
+	NotifyUserQueue     ports.Queue
 }
 
 // NewSharedDependencies will return a new instance of dependencies and register background watcher so we can close any required object
@@ -52,6 +62,9 @@ func NewSharedDependencies(shutdown chan os.Signal) *SharedDeps {
 			PaymentsDBConn: getPaymentsDBConn(e),
 			RabbitMqConn:   getRabbitMqConn(e),
 		}
+		deps.StartPaymentQueue = NewQueue(deps.RabbitMqConn, e.StartPaymentQueueName)
+		deps.ProcessPaymentQueue = NewQueue(deps.RabbitMqConn, e.ProcessPaymentQueueName)
+		deps.NotifyUserQueue = NewQueue(deps.RabbitMqConn, e.NotifyUserQueueName)
 
 		go func() {
 			<-shutdown
