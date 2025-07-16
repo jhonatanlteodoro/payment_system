@@ -6,6 +6,7 @@ import (
 	"github.com/caarlos0/env/v11"
 	"github.com/jackc/pgx/v5"
 	"github.com/jhonatanlteodoro/payment_system/src/ports"
+	"github.com/redis/go-redis/v9"
 	"log"
 	"os"
 	"sync"
@@ -17,6 +18,10 @@ import (
 
 var deps *SharedDeps
 var once sync.Once
+
+const (
+	REDIS_PAYMENT_DISTRIBUTED_LOCK_DB_NUM = 1
+)
 
 type envs struct {
 	DbUser string `env:"DB_USER" envDefault:"secret_user"`
@@ -33,6 +38,12 @@ type envs struct {
 	StartPaymentQueueName   string `env:"START_PAYMENT_QUEUE_NAME" envDefault:"start-payment"`
 	ProcessPaymentQueueName string `env:"PROCESS_PAYMENT_QUEUE_NAME" envDefault:"process-payment"`
 	NotifyUserQueueName     string `env:"NOTIFY_USER_QUEUE_NAME" envDefault:"notify-user"`
+
+	RedisHost        string `env:"REDIS_HOST" envDefault:"localhost"`
+	RedisPort        string `env:"REDIS_PORT" envDefault:"6379"`
+	RedisPassword    string `env:"REDIS_PASSWORD" envDefault:"secret_password"`
+	RedisUsername    string `env:"REDIS_USERNAME" envDefault:"secret_user"`
+	RedisMaxPoolSize int    `env:"REDIS_MAX_POOL_SIZE" envDefault:"20"`
 }
 
 // SharedDeps are intended to hold env vars and shared items [db connections, clients, and etc...]
@@ -46,6 +57,10 @@ type SharedDeps struct {
 	StartPaymentQueue   ports.Queue
 	ProcessPaymentQueue ports.Queue
 	NotifyUserQueue     ports.Queue
+
+	// Caches Conn
+	PaymentDistributedLockDBConn *redis.Client
+	PaymentDistributedLock       ports.DistributedLock
 }
 
 // NewSharedDependencies will return a new instance of dependencies and register background watcher so we can close any required object
@@ -58,13 +73,15 @@ func NewSharedDependencies(shutdown chan os.Signal) *SharedDeps {
 		}
 
 		deps = &SharedDeps{
-			Envs:           e,
-			PaymentsDBConn: getPaymentsDBConn(e),
-			RabbitMqConn:   getRabbitMqConn(e),
+			Envs:                         e,
+			PaymentsDBConn:               getPaymentsDBConn(e),
+			RabbitMqConn:                 getRabbitMqConn(e),
+			PaymentDistributedLockDBConn: getRedisClient(e, REDIS_PAYMENT_DISTRIBUTED_LOCK_DB_NUM),
 		}
 		deps.StartPaymentQueue = NewQueue(deps.RabbitMqConn, e.StartPaymentQueueName)
 		deps.ProcessPaymentQueue = NewQueue(deps.RabbitMqConn, e.ProcessPaymentQueueName)
 		deps.NotifyUserQueue = NewQueue(deps.RabbitMqConn, e.NotifyUserQueueName)
+		deps.PaymentDistributedLock = NewPaymentDistributedLock(deps.PaymentDistributedLockDBConn.Conn())
 
 		go func() {
 			<-shutdown
@@ -75,6 +92,8 @@ func NewSharedDependencies(shutdown chan os.Signal) *SharedDeps {
 			log.Println("Rabbit MQ connection closed...")
 			deps.PaymentsDBConn.Close(ctx)
 			log.Println("Payments DB connection closed...")
+			deps.PaymentDistributedLockDBConn.Close()
+			log.Println("Payments Distributed Lock DB Cache connection closed...")
 			shutdown <- syscall.SIGINT // propagate
 		}()
 	})
@@ -112,4 +131,21 @@ func getRabbitMqConn(env *envs) *amqp.Connection {
 
 	log.Println("RabbitMQ connection established")
 	return conn
+}
+
+func getRedisClient(env *envs, dbNum int) *redis.Client {
+	client := redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%s", env.RedisHost, env.RedisPort),
+		Username: env.RedisUsername,
+		Password: env.RedisPassword,
+		DB:       dbNum,
+		PoolSize: env.RedisMaxPoolSize,
+	})
+
+	_, err := client.Ping(context.Background()).Result()
+	if err != nil {
+		log.Fatalf("Unable to connect to Redis: %v\n", err)
+	}
+
+	return client
 }
