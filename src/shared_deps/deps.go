@@ -42,7 +42,6 @@ type envs struct {
 	RedisHost        string `env:"REDIS_HOST" envDefault:"localhost"`
 	RedisPort        string `env:"REDIS_PORT" envDefault:"6379"`
 	RedisPassword    string `env:"REDIS_PASSWORD" envDefault:"secret_password"`
-	RedisUsername    string `env:"REDIS_USERNAME" envDefault:"secret_user"`
 	RedisMaxPoolSize int    `env:"REDIS_MAX_POOL_SIZE" envDefault:"20"`
 }
 
@@ -136,7 +135,6 @@ func getRabbitMqConn(env *envs) *amqp.Connection {
 func getRedisClient(env *envs, dbNum int) *redis.Client {
 	client := redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", env.RedisHost, env.RedisPort),
-		Username: env.RedisUsername,
 		Password: env.RedisPassword,
 		DB:       dbNum,
 		PoolSize: env.RedisMaxPoolSize,
@@ -147,5 +145,6 @@ func getRedisClient(env *envs, dbNum int) *redis.Client {
 		log.Fatalf("Unable to connect to Redis: %v\n", err)
 	}
 
+	log.Println("Redis connection established")
 	return client
 }

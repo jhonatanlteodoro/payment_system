@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/jhonatanlteodoro/payment_system/src/ports"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"log"
 	"sync"
 	"time"
 )
@@ -121,7 +122,7 @@ func (m *Queue) getWatcherChannel() (*amqp.Channel, error) {
 	return m.watcherChannel, nil
 }
 
-func (m *Queue) WatchQueue(_ context.Context, maxWorkers int, errors chan error, worker func(delivery amqp.Delivery) error) {
+func (m *Queue) WatchQueue(ctx context.Context, maxWorkers int, errors chan error, worker func(delivery amqp.Delivery) error) {
 
 	ch, err := m.getWatcherChannel()
 	if err != nil {
@@ -144,23 +145,62 @@ func (m *Queue) WatchQueue(_ context.Context, maxWorkers int, errors chan error,
 	}
 
 	workersChan := make(chan struct{}, maxWorkers)
+	var wg sync.WaitGroup
 
-	for msg := range queuedChanMessages {
-		workersChan <- struct{}{}
-		go func(c chan struct{}) {
-			defer func() { <-c }()
-			errWorker := worker(msg)
-			if errWorker != nil {
-				errors <- fmt.Errorf("error processing message: %v", errWorker)
-				if errNack := msg.Nack(false, true); errNack != nil {
-					errors <- fmt.Errorf("error nacking message: %v", errNack)
-				}
+	for {
+		select {
+		case msg, ok := <-queuedChanMessages:
+			if !ok {
+				log.Printf("Channel closed for %s", m.QueueName)
 				return
 			}
 
-			if errAck := msg.Ack(false); errAck != nil {
-				errors <- fmt.Errorf("error acking message: %v", errAck)
+			// Check context before processing
+			if ctx.Err() != nil {
+				log.Printf("Context cancelled during processing for %s: %v", m.QueueName, ctx.Err())
+				m.waitForWorkersWithTimeout(&wg, time.Second*3)
+				return
 			}
-		}(workersChan)
+
+			workersChan <- struct{}{}
+			wg.Add(1)
+			go func(c chan struct{}) {
+				defer func() {
+					<-c
+					wg.Done()
+				}()
+				errWorker := worker(msg)
+				if errWorker != nil {
+					errors <- fmt.Errorf("error processing message: %v", errWorker)
+					if errNack := msg.Nack(false, true); errNack != nil {
+						errors <- fmt.Errorf("error nacking message: %v", errNack)
+					}
+					return
+				}
+
+				if errAck := msg.Ack(false); errAck != nil {
+					errors <- fmt.Errorf("error acking message: %v", errAck)
+				}
+			}(workersChan)
+
+		case <-ctx.Done():
+			log.Printf("Watcher for %s is shutting down: %v", m.QueueName, ctx.Err())
+			return
+		}
+	}
+}
+
+func (m *Queue) waitForWorkersWithTimeout(wg *sync.WaitGroup, timeout time.Duration) {
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Printf("All workers finished gracefully for %s", m.QueueName)
+	case <-time.After(timeout):
+		log.Printf("Timeout waiting for workers to finish for %s", m.QueueName)
 	}
 }
