@@ -2,78 +2,105 @@ package workers
 
 import (
 	"context"
-	"fmt"
 	"github.com/jhonatanlteodoro/payment_system/src/shared_deps"
-	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/jhonatanlteodoro/payment_system/src/usecases"
 	"log"
-	"math/rand"
 	"os"
-	"slices"
-	"strconv"
-	"time"
+	"sync"
+	"syscall"
 )
 
-type DummyWorker struct {
-	data []string
-}
-
-func (m *DummyWorker) HasMessageToProcess() bool {
-	if len(m.data) > 0 {
-		return true
-	}
-
-	// mock some random items
-	num := rand.Intn(10)
-	if num%2 == 0 {
-		m.data = append(m.data, strconv.Itoa(num))
-		fmt.Println("Added value to process: ", num)
-	}
-	return false
-}
-
-func (m *DummyWorker) Process(serverDown chan os.Signal) {
-	for {
-		select {
-		case <-serverDown:
-			log.Println("Quit Signal Received - Worker is shutting down...")
-			return
-		default:
-			if m.HasMessageToProcess() {
-				fmt.Println("dummy msg: ", m.data[len(m.data)-1])
-				m.data = slices.Delete(m.data, len(m.data)-1, len(m.data))
-				continue
-			}
-
-			fmt.Println("No message to process")
-			time.Sleep(2 * time.Second)
-		}
-	}
-}
-
-func StartWorker(serverDown chan os.Signal) {
-	deps := shared_deps.GetSharedDependencies()
+func RunAllWorkers(serverDown chan os.Signal) {
+	wg := sync.WaitGroup{}
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		RunStartPaymentWorker(serverDown)
+	}()
+	go func() {
+		defer wg.Done()
+		RunProcessPaymentWorker(serverDown)
+	}()
 
 	go func() {
-		ctx := context.TODO()
-		for i := 0; i < 10; i++ {
-			if err := deps.StartPaymentQueue.Publish(ctx, []byte(fmt.Sprintf("num: %d", i))); err != nil {
-				fmt.Println("Failed to publish message to queue ", err)
-				continue
-			}
-			time.Sleep(1 * time.Second)
-			fmt.Println("Published message to queue ", i)
+		defer wg.Done()
+		RunNotifyWorker(serverDown)
+	}()
+	wg.Wait()
+}
+
+func RunStartPaymentWorker(serverDown chan os.Signal) {
+	deps := shared_deps.GetSharedDependencies()
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	log.Println("Running Start payment worker...")
+	u := usecases.NewProcessPaymentUseCase(deps.ProcessPaymentQueue, deps.NotifyUserQueue, deps.PaymentDistributedLock)
+	go func() {
+		if err := u.Process(ctx); err != nil {
+			log.Println(err)
 		}
 	}()
 
-	ctx := context.TODO()
-	errors := make(chan error)
-	deps.StartPaymentQueue.WatchQueue(ctx, 3, errors, func(delivery amqp.Delivery) error {
-		log.Println("Received a message: ", string(delivery.Body))
-		return nil
-	})
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		<-serverDown
+		log.Println("Quit Signal Received - Worker StartPayment is shutting down...")
+		cancel()
+		serverDown <- syscall.SIGINT // propagate
+	}()
 
-	for e := range errors {
-		log.Println("Error processing message: ", e)
-	}
-	fmt.Println("Worker stopped")
+	wg.Wait()
+	return
+}
+
+func RunProcessPaymentWorker(serverDown chan os.Signal) {
+	deps := shared_deps.GetSharedDependencies()
+
+	ctx, cancel := context.WithCancel(context.TODO())
+
+	log.Println("Running Process Payment worker...")
+	u := usecases.NewProcessPaymentUseCase(deps.ProcessPaymentQueue, deps.NotifyUserQueue, deps.PaymentDistributedLock)
+	go func() {
+		if err := u.Process(ctx); err != nil {
+			log.Println(err)
+		}
+	}()
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		<-serverDown
+		log.Println("Quit Signal Received - Worker ProcessPayment is shutting down...")
+		cancel()
+		serverDown <- syscall.SIGINT // propagate
+	}()
+
+	wg.Wait()
+	return
+}
+
+func RunNotifyWorker(serverDown chan os.Signal) {
+	deps := shared_deps.GetSharedDependencies()
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	log.Println("Running Notify worker...")
+	u := usecases.NewNotify(deps.NotifyUserQueue)
+	go func() {
+		if err := u.Notify(ctx); err != nil {
+			log.Println(err)
+		}
+	}()
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		<-serverDown
+		log.Println("Quit Signal Received - Worker Notify is shutting down...")
+		cancel()
+		serverDown <- syscall.SIGINT // propagate
+	}()
+
+	wg.Wait()
 }
