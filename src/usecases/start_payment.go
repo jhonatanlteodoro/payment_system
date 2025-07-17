@@ -18,10 +18,11 @@ type StartPaymentUseCase struct {
 	processPaymentQueue ports.Queue
 }
 
-func NewStartPaymentUseCase(queue, processPaymentQueue ports.Queue) *StartPaymentUseCase {
+func NewStartPaymentUseCase(queue, processPaymentQueue ports.Queue, cacheDB ports.DistributedLock) *StartPaymentUseCase {
 	return &StartPaymentUseCase{
 		queue:               queue,
 		processPaymentQueue: processPaymentQueue,
+		cacheDB:             cacheDB,
 	}
 }
 
