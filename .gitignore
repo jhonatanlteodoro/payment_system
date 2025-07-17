@@ -28,9 +28,9 @@ go.work.sum
 .env
 
 # Editor/IDE
- .idea/
- .vscode/
+.idea/
+.vscode/
 
- db_data/
- rabbitmq_data/
-
+db_data/
+rabbitmq_data/
+redis_data/

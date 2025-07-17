@@ -10,7 +10,6 @@ if [ ! -d "$volume_path" ]; then
 fi
 
 docker run -d \
-  --name rabbitmq \
   -p $port:5672 \
   -p $ui_port:15672 \
   -e RABBITMQ_DEFAULT_USER=$user \

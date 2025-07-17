@@ -11,7 +11,6 @@ fi
 
 
 docker run -d \
-  --name pgsql17-payment \
   -e POSTGRES_USER=$user \
   -e POSTGRES_PASSWORD=$password \
   -e POSTGRES_DB=$db_name \
