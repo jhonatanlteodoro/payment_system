@@ -34,9 +34,9 @@ func RunStartPaymentWorker(serverDown chan os.Signal) {
 
 	ctx, cancel := context.WithCancel(context.TODO())
 	log.Println("Running Start payment worker...")
-	u := usecases.NewProcessPaymentUseCase(deps.ProcessPaymentQueue, deps.NotifyUserQueue, deps.PaymentDistributedLock)
+	u := usecases.NewStartPaymentUseCase(deps.ProcessPaymentQueue, deps.NotifyUserQueue, deps.PaymentDistributedLock)
 	go func() {
-		if err := u.Process(ctx); err != nil {
+		if err := u.ProcessStartPayment(ctx); err != nil {
 			log.Println(err)
 		}
 	}()
