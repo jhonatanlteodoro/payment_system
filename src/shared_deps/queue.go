@@ -36,6 +36,9 @@ func (m *Queue) channelIsValid(ch *amqp.Channel) bool {
 func (m *Queue) createNewPublisherChannel() error {
 	m.publisherChLock.Lock()
 	defer m.publisherChLock.Unlock()
+	defer func() {
+		log.Println("watcher channel created")
+	}()
 
 	// double-check grants that if another thread was trying to reconnect
 	// we do not override channels
@@ -93,6 +96,9 @@ func (m *Queue) Publish(ctx context.Context, data []byte) error {
 func (m *Queue) createNewWatcherChannel() error {
 	m.watcherChLock.Lock()
 	defer m.watcherChLock.Unlock()
+	defer func() {
+		log.Println("watcher channel created")
+	}()
 
 	// double-check grants that if another thread was trying to reconnect
 	// we do not override channels
@@ -144,11 +150,16 @@ func (m *Queue) WatchQueue(ctx context.Context, maxWorkers int, errors chan erro
 		return
 	}
 
+	log.Println("consuming queued messages for ", m.QueueName)
+
 	workersChan := make(chan struct{}, maxWorkers)
 	var wg sync.WaitGroup
 
 	for {
 		select {
+		default:
+			log.Println("no msgs for ", m.QueueName)
+			time.Sleep(3 * time.Second)
 		case msg, ok := <-queuedChanMessages:
 			if !ok {
 				log.Printf("Channel closed for %s", m.QueueName)
@@ -161,6 +172,8 @@ func (m *Queue) WatchQueue(ctx context.Context, maxWorkers int, errors chan erro
 				m.waitForWorkersWithTimeout(&wg, time.Second*3)
 				return
 			}
+
+			log.Println("Received a message in queue", m.QueueName)
 
 			workersChan <- struct{}{}
 			wg.Add(1)

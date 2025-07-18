@@ -37,11 +37,14 @@ func (m *ProcessPaymentUseCase) workerProcessPayment(delivery amqp.Delivery) err
 	fmt.Println("generating next msg...")
 	time.Sleep(2 * time.Second)
 
+	log.Println("Releasing lock...")
 	if err := m.cacheDB.ReleaseLock(context.TODO(), data.FromAccount); err != nil {
 		log.Println("Failed to release lock ", err.Error())
 		// the lock will expire so, no need to retry to release it here
 	}
+	log.Println("Lock released")
 
+	log.Println("Sending to notifyQueue")
 	if err := m.notifyQueue.Publish(context.TODO(), []byte("payment done")); err != nil {
 		log.Println("Failed to send message ", err.Error())
 		// failed to send to notification should not return an error since it wont change anything for us at this point
