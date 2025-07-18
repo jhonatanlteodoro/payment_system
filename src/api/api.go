@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"github.com/gin-gonic/gin"
+	"github.com/jhonatanlteodoro/payment_system/src/shared_deps"
+	"github.com/jhonatanlteodoro/payment_system/src/usecases"
 	"log"
 	"net/http"
 	"os"
@@ -11,7 +13,10 @@ import (
 )
 
 func registerRoutes(router *gin.Engine) {
-	newPayment().RegisterRoute(router)
+	deps := shared_deps.GetSharedDependencies()
+	startPayment := usecases.NewStartPaymentUseCase(deps.StartPaymentQueue, deps.ProcessPaymentQueue, deps.PaymentDistributedLock)
+
+	newPayment(startPayment).RegisterRoute(router)
 }
 
 func StartApiServer(serverDown chan os.Signal) {
