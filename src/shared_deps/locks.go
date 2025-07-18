@@ -36,7 +36,7 @@ func (m *PaymentDistributedLock) AcquireLock(ctx context.Context, key string) bo
 		return false
 	}
 
-	cmdResult := m.dbConn.Set(ctx, key, "acquired", time.Hour*1)
+	cmdResult := m.dbConn.Set(ctx, key, "acquired", time.Minute*5)
 	if cmdResult.Err() != nil {
 		log.Printf("Error acquiring lock: %s", cmdResult.Err().Error())
 		return false
@@ -52,5 +52,6 @@ func (m *PaymentDistributedLock) ReleaseLock(ctx context.Context, key string) er
 		return fmt.Errorf("error releasing lock: %v", cmdResult.Err().Error())
 	}
 
+	log.Printf("Released lock for: %s\n", key)
 	return nil
 }
