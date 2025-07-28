@@ -25,3 +25,21 @@ type Balance struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+type AccountPaymentQuarterlySummary struct {
+	AccountID               string `json:"account_id"`
+	TotalTransactions       int    `json:"total_transactions"`
+	AvgTransactionValue     int    `json:"avg_transaction_value"`
+	MaxEverTransactionValue int    `json:"max_ever_transaction_value"`
+
+	//AvgWeeklyTransactions  int
+	AvgDailyTransactions int `json:"avg_daily_transactions"`
+	//AvgMonthlyTransactions int
+
+	TodayTransactions int `json:"today_transactions"`
+	//WeeklyTransactions  int
+	//MonthlyTransactions int
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

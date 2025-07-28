@@ -6,6 +6,7 @@ import (
 	"github.com/caarlos0/env/v11"
 	"github.com/jackc/pgx/v5"
 	"github.com/jhonatanlteodoro/payment_system/src/ports"
+	"github.com/jhonatanlteodoro/payment_system/src/query_services"
 	"github.com/redis/go-redis/v9"
 	"log"
 	"os"
@@ -60,6 +61,12 @@ type SharedDeps struct {
 	// Caches Conn
 	PaymentDistributedLockDBConn *redis.Client
 	PaymentDistributedLock       ports.DistributedLock
+
+	// Query Services
+	PaymentQuery                 ports.PaymentsQuery
+	AccountQuery                 ports.AccountQuery
+	BalanceQuery                 ports.BalanceQuery
+	QuarterlyAccountSummaryQuery ports.QuarterlyAccountSummary
 }
 
 // NewSharedDependencies will return a new instance of dependencies and register background watcher so we can close any required object
@@ -76,6 +83,11 @@ func NewSharedDependencies(shutdown chan os.Signal) *SharedDeps {
 			PaymentsDBConn:               getPaymentsDBConn(e),
 			RabbitMqConn:                 getRabbitMqConn(e),
 			PaymentDistributedLockDBConn: getRedisClient(e, REDIS_PAYMENT_DISTRIBUTED_LOCK_DB_NUM),
+
+			PaymentQuery:                 query_services.NewPaymentsQuery(),
+			AccountQuery:                 query_services.NewAccountQuery(),
+			BalanceQuery:                 query_services.NewBalanceQuery(),
+			QuarterlyAccountSummaryQuery: query_services.NewQuarterlyAccountSummary(),
 		}
 		deps.StartPaymentQueue = NewQueue(deps.RabbitMqConn, e.StartPaymentQueueName)
 		deps.ProcessPaymentQueue = NewQueue(deps.RabbitMqConn, e.ProcessPaymentQueueName)

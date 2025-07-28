@@ -34,7 +34,7 @@ func RunStartPaymentWorker(serverDown chan os.Signal) {
 
 	ctx, cancel := context.WithCancel(context.TODO())
 	log.Println("Running Start payment worker...")
-	u := usecases.NewStartPaymentUseCase(deps.StartPaymentQueue, deps.ProcessPaymentQueue, deps.PaymentDistributedLock)
+	u := usecases.NewStartPaymentUseCase(deps.StartPaymentQueue, deps.ProcessPaymentQueue, deps.PaymentDistributedLock, deps.PaymentQuery)
 	go func() {
 		if err := u.ProcessStartPayment(ctx); err != nil {
 			log.Println(err)
@@ -60,7 +60,10 @@ func RunProcessPaymentWorker(serverDown chan os.Signal) {
 	ctx, cancel := context.WithCancel(context.TODO())
 
 	log.Println("Running Process Payment worker...")
-	u := usecases.NewProcessPaymentUseCase(deps.ProcessPaymentQueue, deps.NotifyUserQueue, deps.PaymentDistributedLock)
+	u := usecases.NewProcessPaymentUseCase(
+		deps.ProcessPaymentQueue, deps.NotifyUserQueue, deps.PaymentDistributedLock,
+		deps.PaymentQuery, deps.BalanceQuery, deps.QuarterlyAccountSummaryQuery, usecases.NewProcessingRules(1000), // move to config
+	)
 	go func() {
 		if err := u.Process(ctx); err != nil {
 			log.Println(err)
