@@ -3,12 +3,12 @@ package usecases
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"github.com/jhonatanlteodoro/payment_system/src/ports"
+	"github.com/jhonatanlteodoro/payment_system/src/shared_deps"
 	"github.com/jhonatanlteodoro/payment_system/src/types"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"log"
-	"time"
 )
 
 type ProcessPaymentUseCase struct {
@@ -16,13 +16,28 @@ type ProcessPaymentUseCase struct {
 	cacheDB ports.DistributedLock
 
 	notifyQueue ports.Queue
+
+	paymentQuery ports.PaymentsQuery
+	balanceQuery ports.BalanceQuery
+	rules        ports.ProcessingRules
+	summaryQuery ports.QuarterlyAccountSummary
 }
 
-func NewProcessPaymentUseCase(queue, notifyQueue ports.Queue, cacheDB ports.DistributedLock) *ProcessPaymentUseCase {
+func NewProcessPaymentUseCase(
+	queue, notifyQueue ports.Queue, cacheDB ports.DistributedLock,
+	paymentQuery ports.PaymentsQuery, balanceQuery ports.BalanceQuery,
+	summaryQuery ports.QuarterlyAccountSummary,
+	paymentRules ports.ProcessingRules,
+) *ProcessPaymentUseCase {
 	return &ProcessPaymentUseCase{
 		queue:       queue,
 		cacheDB:     cacheDB,
 		notifyQueue: notifyQueue,
+
+		paymentQuery: paymentQuery,
+		balanceQuery: balanceQuery,
+		summaryQuery: summaryQuery,
+		rules:        paymentRules,
 	}
 }
 
@@ -32,10 +47,65 @@ func (m *ProcessPaymentUseCase) workerProcessPayment(delivery amqp.Delivery) err
 		return err
 	}
 
-	fmt.Println("Processing something...")
-	fmt.Println("Updating the database...")
-	fmt.Println("generating next msg...")
-	time.Sleep(2 * time.Second)
+	ctx := context.TODO()
+	tx, err := shared_deps.GetSharedDependencies().PaymentsDBConn.Begin(ctx)
+	if err != nil {
+		return err
+	}
+
+	exc := func() error {
+		balanceFrom, err := m.balanceQuery.GetBalance(ctx, data.FromAccount, tx)
+		if err != nil {
+			return err
+		}
+
+		if balanceFrom.Amount <= 0 {
+			return errors.New("no available balanceQuery")
+		}
+
+		balanceTo, err := m.balanceQuery.GetBalance(ctx, data.ToAccount, tx)
+		if err != nil {
+			return err
+		}
+
+		if balanceFrom.Amount < data.Amount {
+			log.Println("insufficient funds")
+			data.Status = "insufficient funds"
+			return m.paymentQuery.UpdatePaymentStatus(ctx, data, tx)
+		}
+
+		summary, err := m.summaryQuery.GetSummary(ctx, data.ToAccount, tx)
+		if err != nil {
+			return err
+		}
+
+		reason, err := m.rules.ProcessRules(ctx, data, summary)
+		if err != nil {
+			return err
+		}
+
+		if reason != "" {
+			log.Println("payment not allowed: ", reason)
+			data.Status = reason
+			return m.paymentQuery.UpdatePaymentStatus(ctx, data, tx)
+		}
+		log.Println("payment allowed")
+
+		balanceFrom.Amount -= data.Amount
+		if err := m.balanceQuery.UpdateBalance(ctx, balanceFrom, tx); err != nil {
+			return err
+		}
+
+		balanceTo.Amount += data.Amount
+		if err := m.balanceQuery.UpdateBalance(ctx, balanceTo, tx); err != nil {
+			return err
+		}
+		return nil
+	}()
+
+	if exc != nil {
+		return err
+	}
 
 	log.Println("Releasing lock...")
 	if err := m.cacheDB.ReleaseLock(context.TODO(), data.FromAccount); err != nil {
