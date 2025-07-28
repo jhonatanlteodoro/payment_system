@@ -50,3 +50,50 @@ Deps:
 - env [Why? even dough we already had viper in this project I hate viper env embed struct definition, too dirty for me, feel free to use whatever you want]
 - amqp091-go [Why? seems to be the most trustable lib available for rabbitmq, still has a few limitations and constraints but im planning to implement a few extensions for learning purposes in the near future]
 - redis-go [Why? It's pretty simple to use and it is the official go lib for redis]
+
+
+
+# !After implementation Concerns
+I'm currently having a lot of things to deal at the same time so, I have promised quite a bit things before that I'll not be able to manage right now.
+There's more issues that I can count right now and that's not a surprise, even dough I would love to complete this version and make it perfect at some level, It won't be possible because I still want to make the version 3 and other parallel things too...
+
+Anyway, What will need to change here to be able handle the volume I proposed paying for small machines?
+!Again this is just a generic idea, every system will have its own constraints and needs...
+
+Application:
+- You can keep the application as it is in terms of service setup and high level flow
+  -- keep the workers running in the same machine as the main application, each machine with something like 512mb, 1CPU core, should give you enough to play[off course assuming there's nothing to heavy on it...]
+  -- as you payment logic grows you will need to re-design the workers idea so you have more small units on each instead of a complete flow in only one
+
+Redis:
+- In order for the distributed lock works properly first you will need to have a cluster and not only one machine
+- After the cluster been set, you now can use a library to make the lock for you or implement yourself [if you are doing it for learning purposes I personally encourage you write your own, will be really cool :)]
+- remember to save the data into a volume of at least the distributed lock info
+
+RabbitMQ:
+- If you want you can keep this and just make a decent setup for it, you will not need a lot from here. But that's your choice...
+- In order to this work you have to re-write/implement your own consumer/publisher/exchange code, what we have here its just few hours that i had free and decide to play with rabbitmq, I have no idea if that would work in real word,
+find a good library or invest some time to write your own code...
+- You will only need one avg machine with disk space for the current setup and that should be fine
+
+Postgresql:
+- For the proposed transaction per seconds, one primary machine to handle the writes + one read replicas machine should be good
+- I have added some notes about this in the query file but will add it here again just in case... For performance purposes do not use view table,
+instead use materialized view and only on read replica.
+- I have not added any index, feel free to add it.
+
+Distribtued lock:
+- I have not locked both from-to account, only from, this will need to be fixed to avoid balance issues
+- This version use set method from redis, this should be changed to setNX to guarantee it will raise an error if that key already exists
+
+That's all remember for now...
+Summary:
+- 3 Apps machines/pods
+- 3 redis machines - 1cluster
+- 1 rebbitmq machine
+- 2 postgresql machine
+- 1 monolithic code base
++logging, monitoring etc...
+The concept here is simple, trying to serve as much as possible with low resources, that setup will guarantee you
+minimum 100/requests/second easily, but if you play around with it you will notice that this could easily handle up-to 10 times this value
+if you configure and allocate resources for it properly and off course design a decent payment flow based on this primitive design.
