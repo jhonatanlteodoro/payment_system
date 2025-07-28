@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/jhonatanlteodoro/payment_system/src/ports"
+	"github.com/jhonatanlteodoro/payment_system/src/shared_deps"
 	"github.com/jhonatanlteodoro/payment_system/src/types"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"log"
-	"time"
 )
 
 type StartPaymentUseCase struct {
@@ -16,13 +16,16 @@ type StartPaymentUseCase struct {
 	cacheDB ports.DistributedLock
 
 	processPaymentQueue ports.Queue
+
+	paymentQuery ports.PaymentsQuery
 }
 
-func NewStartPaymentUseCase(queue, processPaymentQueue ports.Queue, cacheDB ports.DistributedLock) *StartPaymentUseCase {
+func NewStartPaymentUseCase(queue, processPaymentQueue ports.Queue, cacheDB ports.DistributedLock, paymentQuerySvc ports.PaymentsQuery) *StartPaymentUseCase {
 	return &StartPaymentUseCase{
 		queue:               queue,
 		processPaymentQueue: processPaymentQueue,
 		cacheDB:             cacheDB,
+		paymentQuery:        paymentQuerySvc,
 	}
 }
 
@@ -46,24 +49,42 @@ func (m *StartPaymentUseCase) workerStartPayment(delivery amqp.Delivery) error {
 		return err
 	}
 
-	if !m.cacheDB.AcquireLock(context.TODO(), data.FromAccount) {
-		log.Println("Account is locked. Enqueuing msg")
-		m.StartPayment(context.Background(), data)
-		return nil
-	}
+	ctx := context.TODO()
 
-	fmt.Println("Lock Acquired")
-	fmt.Println("Processing something...")
-	fmt.Println("Updating the database...")
-	fmt.Println("generating next msg...")
-	time.Sleep(1 * time.Second)
-
-	payload, err := json.Marshal(data)
+	tx, err := shared_deps.GetSharedDependencies().PaymentsDBConn.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	if err := m.processPaymentQueue.Publish(context.TODO(), payload); err != nil {
-		return err
+	defer tx.Rollback(ctx)
+
+	if !m.cacheDB.AcquireLock(ctx, data.FromAccount) {
+		log.Println("Account is locked. Enqueuing msg")
+		return m.StartPayment(context.Background(), data)
+	}
+	fmt.Println("Lock Acquired")
+
+	exc := func() error {
+		log.Println("Starting payment transaction")
+		err := m.paymentQuery.CreatePayment(ctx, data, tx)
+		if err != nil {
+			return err
+		}
+		log.Println("payment created")
+
+		payload, err := json.Marshal(data)
+		if err != nil {
+			return err
+		}
+		if err = m.processPaymentQueue.Publish(context.TODO(), payload); err != nil {
+			return err
+		}
+
+		return tx.Commit(ctx)
+	}()
+
+	if exc != nil {
+		m.cacheDB.ReleaseLock(ctx, data.FromAccount)
+		return m.StartPayment(context.Background(), data)
 	}
 
 	log.Println("Message published for processing. into Payment Processing Queue")
