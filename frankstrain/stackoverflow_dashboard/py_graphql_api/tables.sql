@@ -49,5 +49,5 @@ CREATE TABLE IF NOT EXISTS posts (
 
 select count(*) from users; --22261600
 select count(*) from tags; --65000
-select count(*) from posts;
+select count(*) from posts; -- 11491000 - missing a lot of item yet, my pc entered in sleep mode so the connection to db was dropped... will update this values later, i have enough data for now
 select count(*) from votes; --90537500
