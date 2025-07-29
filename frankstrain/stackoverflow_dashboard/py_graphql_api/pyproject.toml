@@ -1,0 +1,21 @@
+[project]
+name = "graphql-api"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Jhonatan Teodoro",email = "mollitiamteodoro@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10,<4"
+dependencies = [
+    "fastapi (>=0.116.1,<0.117.0)",
+    "ariadne (>=0.26.2,<0.27.0)"
+]
+
+[tool.poetry]
+packages = [{include = "graphql_api", from = "src"}]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
