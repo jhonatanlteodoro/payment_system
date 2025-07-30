@@ -1,26 +1,83 @@
-schema {
-    query: Query
+"""
+An object with an ID.
+"""
+interface Node {
+  """
+  ID of the object.
+  """
+  id: ID!
 }
 
-type Post {
+"""
+Contains information for your query attempt
+"""
+interface QueryResult {
+    """
+    Whether or not your query could be completed
+    """
+    success: Boolean!
+
+    """
+    Error message when the query fails, null when successful
+    """
+    error: String
+}
+
+"""
+A post contains detailed information of stackoverflow post
+"""
+type Post implements Node {
+    # from node
     id: ID!
+
+    """
+    Contains the title of the post
+    """
     title: String!
+
+    """
+    Contains the date of the post creation
+    """
     created_at: String!
 }
 
-type PostResult {
+"""
+A single query result contains information for your query attempt regarding a specific object type and its object response
+"""
+type SingleObjectQueryResult implements QueryResult{
+    # from query result
     success: Boolean!
-    error: [String]
-    post: Post
+    error: String
+
+    """
+    Contains your object result, null when query fails
+    """
+    data: Node
 }
 
-type PostsResult {
+"""
+A multi object query result contains information for your query attempt regarding a specific object type and its objects response
+"""
+type MultiObjectQueryResult implements QueryResult{
+    # from query result
     success: Boolean!
-    error: [String]
-    post: [Post]
+    error: String
+
+    """
+    Contains your list of data objects, empty when query fails
+    """
+    data: [Node]!
 }
+
 
 type Query {
-    listPosts: PostsResult!
-    getPost(id: ID!): PostResult!
+    """
+    Retrieves all posts from the system
+    """
+    listPosts: MultiObjectQueryResult!
+
+    """
+    Retrieves a specific post by its unique identifier
+    """
+    getPost(id: ID!): SingleObjectQueryResult!
 }
