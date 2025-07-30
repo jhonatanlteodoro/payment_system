@@ -1,7 +1,15 @@
 from ariadne import QueryType, make_executable_schema, InterfaceType, load_schema_from_path
 from ariadne.asgi import GraphQL
 from fastapi import FastAPI, Request
+from psycopg_pool import ConnectionPool
 
+from src.data.posts import PostsQuery
+
+db_url = "postgresql://secret_user:secret_password@localhost:5432/stackoverflow"
+connection_pool = ConnectionPool(db_url, max_size=5, open=True, num_workers=5)
+connection_pool.wait()
+print("pool ready")
+pp = PostsQuery(connection_pool)
 
 type_defs = load_schema_from_path("./schema.graphql")
 query = QueryType()
@@ -23,15 +31,13 @@ def resolve_node_type(obj, *args, **kwargs):
 
 @query.field("listPosts")
 def resolve_hello(*_):
-    post_sample = {"id": "id-id-id", "title": "title tile", "created_at": "2020..."}
-    posts_list_result = [post_sample]
-    return {"success": True, "error": "", "data": posts_list_result}
+    data = [post.to_graphql_data() for post in pp.resolve_list_posts()]
+    return {"success": True, "error": "", "data": data}
 
 @query.field("getPost")
 def resolve_get_post(*args, **kwargs):
-    print(kwargs)
-    post_sample = {"resolve_type": "Post" , "id": "id-id-id", "title": "title tile", "created_at": "2020..."}
-    posts_result = {"success": True, "error": "", "data": post_sample}
+    data = pp.resolve_post(int(kwargs["id"]))
+    posts_result = {"success": True, "error": "", "data": data.to_graphql_data()}
     return posts_result
 
 
