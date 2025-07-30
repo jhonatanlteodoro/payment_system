@@ -31,14 +31,50 @@ type Post implements Node {
     id: ID!
 
     """
-    Contains the title of the post
+    Contains the date of the post creation
+    #todo: check date format
     """
-    title: String!
+    creation_date: String!
 
     """
-    Contains the date of the post creation
+    Contains the score of this post [no idea how this was calculated on stackoverflow]
     """
-    created_at: String!
+    score: Int!
+
+    """
+    Contains the type of the post [need to investigate yet but i guess every comment on stackoverflow was a post too so imagine this was used to identify them, base question from answers.. not sure]
+    """
+    post_type_id: Int!
+
+    """
+    Contains the post total views
+    """
+    view_count: Int!
+
+    """
+    Contains the user id of who created this post
+    """
+    owner_user_id: String!
+
+    """
+    Contains the tags applied for this post using | as limiters. e.g |python|javascript|
+    """
+    tags: String!
+
+    """
+    Contains the total answers this post have got
+    """
+    answer_count: Int!
+
+    """
+    Contains the total comments this post have got
+    """
+    comment_count: Int!
+
+    """
+    Contains the total favorite this post have got
+    """
+    favorite_count: Int!
 }
 
 """
