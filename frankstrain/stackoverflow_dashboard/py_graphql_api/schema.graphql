@@ -8,6 +8,17 @@ interface Node {
   id: ID!
 }
 
+enum PostType {
+  QUESTION
+  ANSWER
+}
+
+enum VoteType {
+  UP_VOTE
+  DOWN_VOTE
+  FAVORITE
+}
+
 """
 Contains information for your query attempt
 """
@@ -71,9 +82,9 @@ type Post implements Node {
     score: Int!
 
     """
-    Contains the type of the post [need to investigate yet but i guess every comment on stackoverflow was a post too so imagine this was used to identify them, base question from answers.. not sure]
+    Contains the type of the post
     """
-    post_type_id: Int!
+    post_type_id: PostType!
 
     """
     Contains the post total views
@@ -114,14 +125,17 @@ type Vote implements Node {
     id: ID!
 
     """
+    Votes's post id
     """
     post_id: ID!
 
     """
+    Contains the vote type of this vote
     """
-    vote_type_id: Int!
+    vote_type_id: VoteType!
 
     """
+    Vote's creation date
     """
     creation_date: String!
 }

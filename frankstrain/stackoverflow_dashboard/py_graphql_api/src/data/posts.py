@@ -1,14 +1,18 @@
+import enum
 from dataclasses import dataclass
 from datetime import datetime
 
 from src.data.db_utils import db_data_factory, execute_query
 
+class PostType(enum.IntEnum):
+    QUESTION = 1
+    ANSWER = 2
 
 @dataclass
 class Post:
     id: int
     score: int
-    post_type_id: int
+    post_type_id: PostType
     creation_date: datetime
     view_count: int
     owner_user_id: int
@@ -20,6 +24,7 @@ class Post:
     def to_graphql_data(self) -> dict:
         data = self.__dict__
         data["id"] = str(data["id"])
+        data["post_type_id"] = PostType(data["post_type_id"])
         return data
 
 class PostsQuery:

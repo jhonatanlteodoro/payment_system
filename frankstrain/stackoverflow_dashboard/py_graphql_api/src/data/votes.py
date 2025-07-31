@@ -1,17 +1,25 @@
+import enum
 from dataclasses import dataclass
 from datetime import datetime
 from src.data.db_utils import db_data_factory, execute_query
+
+
+class VoteType(enum.IntEnum):
+    UP_VOTE = 2
+    DOWN_VOTE = 3
+    FAVORITE = 5
 
 @dataclass
 class Vote:
     id: int
     post_id: int
-    vote_type_id: int
+    vote_type_id: VoteType
     creation_date: datetime
 
     def to_graphql_data(self) -> dict:
         data = self.__dict__
         data["id"] = str(data["id"])
+        data["vote_type_id"] = VoteType(data["vote_type_id"]).value
         return data
 
 

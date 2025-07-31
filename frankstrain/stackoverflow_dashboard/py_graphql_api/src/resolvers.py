@@ -1,6 +1,11 @@
+import enum
+
 from fastapi import Depends, APIRouter, Request
-from ariadne import QueryType, make_executable_schema, InterfaceType, load_schema_from_path
+from ariadne import QueryType, make_executable_schema, InterfaceType, load_schema_from_path, EnumType
 from ariadne.asgi import GraphQL
+
+from src.data.posts import PostType
+from src.data.votes import VoteType
 from src.types.container import ContainerInterface
 from src.types.votes import VotesQueryInterface
 from src.types.posts import PostsQueryInterface
@@ -9,6 +14,16 @@ from src.container import get_container
 query = QueryType()
 type_defs = load_schema_from_path("./schema.graphql")
 
+vote_type_enum = EnumType("VoteType", {
+    "UP_VOTE": VoteType.UP_VOTE,
+    "DOWN_VOTE": VoteType.DOWN_VOTE,
+    "FAVORITE": VoteType.FAVORITE,
+})
+
+post_type_enum = EnumType("PostType", {
+    "QUESTION": PostType.QUESTION,
+    "ANSWER": PostType.ANSWER,
+})
 
 # Create interface resolver for Node
 node_interface = InterfaceType("Node")
@@ -26,7 +41,6 @@ def resolve_node_type(obj, info, *args):
         return obj["resolve_type"]
 
     return None
-
 
 @query.field("listPosts")
 def resolve_list_posts(_, info):
@@ -77,7 +91,7 @@ async def handle_graphql_query(
     return await graphql_app.handle_request(request)
 
 
-schema = make_executable_schema(type_defs, query, node_interface)
+schema = make_executable_schema(type_defs, query, node_interface, vote_type_enum, post_type_enum)
 graphql_app = GraphQL(
     schema,
     debug=True,
