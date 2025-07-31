@@ -1,0 +1,361 @@
+# queries suggestion from claude - saving for reference
+scalar DateTime
+scalar Date
+
+type Query {
+  # Time-Series & Trending Analysis
+  postsOverTime(
+    interval: TimeInterval!
+    startDate: DateTime
+    endDate: DateTime
+    postType: PostType
+  ): [PostTimeSeriesData!]!
+
+  tagPopularityTrends(
+    tags: [String!]!
+    interval: TimeInterval!
+    startDate: DateTime
+    endDate: DateTime
+  ): [TagTrendData!]!
+
+  votingTrends(
+    interval: TimeInterval!
+    startDate: DateTime
+    endDate: DateTime
+    voteType: VoteType
+  ): [VoteTrendData!]!
+
+  # User Behavior & Gamification
+  powerUsers(
+    limit: Int = 10
+    minReputation: Int
+    sortBy: PowerUserSortBy = REPUTATION
+  ): [PowerUser!]!
+
+  userActivityDistribution: UserActivityStats!
+
+  communityHealthMetrics(
+    startDate: DateTime
+    endDate: DateTime
+  ): CommunityHealth!
+
+  # Content Quality & Engagement
+  topPostsByScore(
+    limit: Int = 10
+    postType: PostType
+    timeframe: Timeframe
+  ): [PostAnalytics!]!
+
+  tagNetworkAnalysis(
+    minCoOccurrence: Int = 5
+    limit: Int = 20
+  ): [TagRelationship!]!
+
+  unansweredQuestionsBacklog(
+    tags: [String!]
+    minScore: Int
+    sortBy: UnansweredSortBy = NEWEST
+    limit: Int = 50
+  ): [UnansweredQuestion!]!
+
+  # Advanced Analytics
+  userExpertiseMapping(
+    userId: ID!
+  ): UserExpertise!
+
+  postEngagementAnalysis(
+    postId: ID!
+  ): PostEngagement!
+
+  voteVelocityAnalysis(
+    limit: Int = 10
+    timeWindow: Int = 24 # hours
+  ): [PostVelocity!]!
+
+  tagResponseTimeAnalysis(
+    tags: [String!]!
+  ): [TagResponseTime!]!
+
+  # Dashboard Overview
+  dashboardOverview(
+    dateRange: DateRange
+  ): DashboardSummary!
+}
+
+# Input Types
+input DateRange {
+  start: DateTime!
+  end: DateTime!
+}
+
+enum TimeInterval {
+  HOUR
+  DAY
+  WEEK
+  MONTH
+  QUARTER
+  YEAR
+}
+
+enum PostType {
+  QUESTION # post_type_id = 1
+  ANSWER   # post_type_id = 2
+}
+
+enum VoteType {
+  UP_VOTE      # vote_type_id = 2
+  DOWN_VOTE    # vote_type_id = 3
+  FAVORITE     # vote_type_id = 5
+}
+
+enum PowerUserSortBy {
+  REPUTATION
+  ANSWER_RATIO
+  TOTAL_POSTS
+  VOTE_RATIO
+}
+
+enum Timeframe {
+  LAST_WEEK
+  LAST_MONTH
+  LAST_QUARTER
+  LAST_YEAR
+  ALL_TIME
+}
+
+enum UnansweredSortBy {
+  NEWEST
+  OLDEST
+  HIGHEST_SCORE
+  MOST_VIEWS
+}
+
+# Response Types
+type PostTimeSeriesData {
+  date: DateTime!
+  questionCount: Int!
+  answerCount: Int!
+  totalCount: Int!
+  avgScore: Float!
+}
+
+type TagTrendData {
+  tag: String!
+  date: DateTime!
+  postCount: Int!
+  totalScore: Int!
+  avgScore: Float!
+}
+
+type VoteTrendData {
+  date: DateTime!
+  upVotes: Int!
+  downVotes: Int!
+  favorites: Int!
+  totalVotes: Int!
+}
+
+type PowerUser {
+  user: User!
+  stats: PowerUserStats!
+}
+
+type PowerUserStats {
+  totalQuestions: Int!
+  totalAnswers: Int!
+  answerToQuestionRatio: Float!
+  avgQuestionScore: Float!
+  avgAnswerScore: Float!
+  totalVotesReceived: Int!
+  expertiseTags: [String!]!
+}
+
+type UserActivityStats {
+  totalUsers: Int!
+  activeUsers: Int! # users with posts
+  topPercentileByReputation: [User!]!
+  reputationDistribution: [ReputationBucket!]!
+}
+
+type ReputationBucket {
+  minReputation: Int!
+  maxReputation: Int!
+  userCount: Int!
+}
+
+type CommunityHealth {
+  totalQuestions: Int!
+  answeredQuestions: Int!
+  unansweredQuestions: Int!
+  avgAnswersPerQuestion: Float!
+  avgTimeToFirstAnswer: Float # in hours
+  questionAnswerRatio: Float!
+}
+
+type PostAnalytics {
+  post: Post!
+  engagementScore: Float!
+  velocityScore: Float!
+  tagPopularityBonus: Float!
+}
+
+type TagRelationship {
+  tag1: String!
+  tag2: String!
+  coOccurrenceCount: Int!
+  correlationStrength: Float!
+}
+
+type UnansweredQuestion {
+  post: Post!
+  daysSincePosted: Int!
+  viewsPerDay: Float!
+  tags: [String!]!
+}
+
+type UserExpertise {
+  user: User!
+  primaryTags: [TagExpertise!]!
+  totalContributions: Int!
+  expertiseScore: Float!
+}
+
+type TagExpertise {
+  tag: String!
+  postCount: Int!
+  avgScore: Float!
+  totalScore: Int!
+  expertiseLevel: ExpertiseLevel!
+}
+
+enum ExpertiseLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+type PostEngagement {
+  post: Post!
+  totalVotes: Int!
+  voteVelocity: Float! # votes per hour since creation
+  viewToVoteRatio: Float!
+  engagementTrend: [EngagementPoint!]!
+}
+
+type EngagementPoint {
+  hoursAfterCreation: Int!
+  cumulativeVotes: Int!
+  cumulativeViews: Int!
+}
+
+type PostVelocity {
+  post: Post!
+  votesInTimeWindow: Int!
+  velocityScore: Float!
+  tags: [String!]!
+}
+
+type TagResponseTime {
+  tag: String!
+  avgResponseTime: Float! # in hours
+  medianResponseTime: Float! # in hours
+  totalQuestions: Int!
+  answeredQuestions: Int!
+}
+
+type DashboardSummary {
+  timeRange: DateRange!
+  overview: CommunityHealth!
+  trendingTags: [TagTrendSummary!]!
+  topContributors: [User!]!
+  recentHighEngagement: [Post!]!
+  systemHealth: SystemHealthMetrics!
+}
+
+type TagTrendSummary {
+  tag: String!
+  currentPeriodCount: Int!
+  previousPeriodCount: Int!
+  growthRate: Float!
+  trendDirection: TrendDirection!
+}
+
+enum TrendDirection {
+  RISING
+  FALLING
+  STABLE
+}
+
+type SystemHealthMetrics {
+  avgQuestionsPerDay: Float!
+  avgAnswersPerDay: Float!
+  unansweredQuestionPercentage: Float!
+  activeUserGrowth: Float!
+}
+
+# Base Types
+type User {
+  id: ID!
+  displayName: String!
+  location: String!
+  reputation: Int!
+  views: Int!
+  upVotes: Int!
+  downVotes: Int!
+
+  # Computed fields
+  posts: [Post!]!
+  totalPosts: Int!
+  questionsCount: Int!
+  answersCount: Int!
+}
+
+type Post {
+  id: ID!
+  postTypeId: Int!
+  creationDate: DateTime!
+  score: Int!
+  viewCount: Int!
+  ownerUserId: ID!
+  tags: [String!]! # parsed from tags string
+  answerCount: Int!
+  commentCount: Int!
+  favoriteCount: Int!
+
+  # Relations
+  owner: User!
+  votes: [Vote!]!
+
+  # Computed fields
+  isQuestion: Boolean!
+  isAnswer: Boolean!
+  ageInDays: Int!
+  engagementRatio: Float! # (votes + views + comments) / age
+}
+
+type Vote {
+  id: ID!
+  postId: ID!
+  voteTypeId: Int!
+  creationDate: DateTime!
+
+  # Relations
+  post: Post!
+
+  # Computed fields
+  voteType: VoteType!
+}
+
+type Tag {
+  id: ID!
+  name: String!
+  count: Int!
+  excerptPostId: ID
+  wikiPostId: ID
+
+  # Computed fields from posts
+  avgScore: Float!
+  totalPosts: Int!
+  recentActivity: Int! # posts in last 30 days
+}

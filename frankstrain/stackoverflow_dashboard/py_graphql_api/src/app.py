@@ -9,7 +9,7 @@ def start_app():
     from src.data.votes import VotesQuery
 
     from src.resolvers import router
-    print("here")
+
     app = FastAPI(
         title="StackOverflow Dashboard",
         description="Dashboard for StackOverflow",
