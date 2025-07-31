@@ -24,6 +24,35 @@ interface QueryResult {
 }
 
 """
+A single query result contains information for your query attempt regarding a specific object type and its object response
+"""
+type SingleObjectQueryResult implements QueryResult{
+    # from query result
+    success: Boolean!
+    error: String
+
+    """
+    Contains your object result, null when query fails
+    """
+    data: Node
+}
+
+"""
+A multi object query result contains information for your query attempt regarding a specific object type and its objects response
+"""
+type MultiObjectQueryResult implements QueryResult{
+    # from query result
+    success: Boolean!
+    error: String
+
+    """
+    Contains your list of data objects, empty when query fails
+    """
+    data: [Node]!
+}
+
+
+"""
 A post contains detailed information of stackoverflow post
 """
 type Post implements Node {
@@ -78,31 +107,23 @@ type Post implements Node {
 }
 
 """
-A single query result contains information for your query attempt regarding a specific object type and its object response
+A post contains detailed information of stackoverflow post
 """
-type SingleObjectQueryResult implements QueryResult{
-    # from query result
-    success: Boolean!
-    error: String
+type Vote implements Node {
+    # from node
+    id: ID!
 
     """
-    Contains your object result, null when query fails
     """
-    data: Node
-}
-
-"""
-A multi object query result contains information for your query attempt regarding a specific object type and its objects response
-"""
-type MultiObjectQueryResult implements QueryResult{
-    # from query result
-    success: Boolean!
-    error: String
+    post_id: ID!
 
     """
-    Contains your list of data objects, empty when query fails
     """
-    data: [Node]!
+    vote_type_id: Int!
+
+    """
+    """
+    creation_date: String!
 }
 
 
@@ -116,4 +137,15 @@ type Query {
     Retrieves a specific post by its unique identifier
     """
     getPost(id: ID!): SingleObjectQueryResult!
+
+    """
+    Retrieves all votes from the system
+    """
+    listVotes: MultiObjectQueryResult!
+
+    """
+    Retrieves a specific vote by its unique identifier
+    """
+    getVote(id: ID!): SingleObjectQueryResult!
+
 }
