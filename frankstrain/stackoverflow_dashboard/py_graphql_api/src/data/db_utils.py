@@ -1,8 +1,10 @@
 from collections.abc import Callable
+from contextlib import asynccontextmanager
 from typing import Any, Union, List, Tuple, TypeVar
 
+from fastapi import FastAPI
 from psycopg import Cursor
-from psycopg_pool import ConnectionPool
+from psycopg_pool import ConnectionPool, AsyncConnectionPool
 
 DataClassType = TypeVar('DataClassType', bound="DataClass")
 
@@ -25,3 +27,13 @@ def execute_query(db: ConnectionPool, query: str, query_args: Tuple[str], factor
             if multiple_objects:
                 return curs.fetchall()
             return curs.fetchone()
+
+
+db_url = "postgresql://secret_user:secret_password@localhost:5432/stackoverflow"
+connection_pool = ConnectionPool(db_url, num_workers=2, open=False)
+
+@asynccontextmanager
+async def db_connection_as_lifespan(app: FastAPI):
+    connection_pool.open()
+    yield
+    connection_pool.close()
