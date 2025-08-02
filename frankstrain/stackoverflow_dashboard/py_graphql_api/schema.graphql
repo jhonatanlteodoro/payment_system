@@ -153,8 +153,7 @@ type MostUsedTagsOvertime {
 
 type PostHistogram {
     # from query result
-    success: Boolean!
-    errors: [String!]
+    errors: [String!]!
 
     created_overtime: [PostCreationOverTime!]
     most_used_tags_overtime: [MostUsedTagsOvertime!]
