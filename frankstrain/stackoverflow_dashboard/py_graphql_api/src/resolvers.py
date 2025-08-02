@@ -46,25 +46,25 @@ def resolve_node_type(obj, info, *args):
 @query.field("listPosts")
 async def resolve_list_posts(_, info):
     container = info.context["container"]
-    data = [post.to_graphql_data() for post in container.get_instance(PostsQueryInterface).get_posts()]
+    data = [post.to_graphql_data() for post in await container.get_instance(PostsQueryInterface).get_posts()]
     return {"success": True, "error": "", "data": data}
 
 @query.field("getPost")
 async def resolve_get_post(_, info, id: str):
     container = info.context["container"]
-    data = container.get_instance(PostsQueryInterface).get_post(int(id))
+    data = await container.get_instance(PostsQueryInterface).get_post(int(id))
     return {"success": True, "error": "", "data": data.to_graphql_data()}
 
 @query.field("listVotes")
 async def resolve_list_votes(_, info):
     container = info.context["container"]
-    data = [post.to_graphql_data() for post in container.get_instance(VotesQueryInterface).get_votes()]
+    data = [post.to_graphql_data() for post in await container.get_instance(VotesQueryInterface).get_votes()]
     return {"success": True, "error": "", "data": data}
 
 @query.field("getVote")
 async def resolve_get_vote(_, info, id: str):
     container = info.context["container"]
-    data = container.get_instance(VotesQueryInterface).get_vote(int(id))
+    data = await container.get_instance(VotesQueryInterface).get_vote(int(id))
     return {"success": True, "error": "", "data": data.to_graphql_data()}
 
 

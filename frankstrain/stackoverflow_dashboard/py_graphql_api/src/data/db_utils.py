@@ -3,12 +3,12 @@ from contextlib import asynccontextmanager
 from typing import Any, Union, List, Tuple, TypeVar
 
 from fastapi import FastAPI
-from psycopg import Cursor
-from psycopg_pool import ConnectionPool, AsyncConnectionPool
+from psycopg import Cursor, AsyncCursor
+from psycopg_pool import AsyncConnectionPool
 
 DataClassType = TypeVar('DataClassType', bound="DataClass")
 
-def db_data_factory(data_class: DataClassType) -> Callable[[Cursor], Callable[[Any], Any]]:
+def db_data_factory(data_class: DataClassType) -> Callable[[AsyncCursor], Callable[[Any], Any]]:
     def handle_cursor(cursor):
         columns = [info.name for info in cursor.description]
 
@@ -20,20 +20,20 @@ def db_data_factory(data_class: DataClassType) -> Callable[[Cursor], Callable[[A
     return handle_cursor
 
 
-def execute_query(db: ConnectionPool, query: str, query_args: Tuple[str], factory: Callable[[Cursor], Any], multiple_objects=False) -> Union[List[Any], Any, None]:
-    with db.connection() as conn:
-        with conn.cursor(row_factory=factory) as curs:
-            curs.execute(query, query_args)
+async def execute_query(db: AsyncConnectionPool, query: str, query_args: Tuple[str], factory: Callable[[Cursor], Any], multiple_objects=False) -> Union[List[Any], Any, None]:
+    async with db.connection() as conn:
+        async with conn.cursor(row_factory=factory) as curs:
+            await curs.execute(query, query_args)
             if multiple_objects:
-                return curs.fetchall()
-            return curs.fetchone()
+                return await curs.fetchall()
+            return await curs.fetchone()
 
 
 db_url = "postgresql://secret_user:secret_password@localhost:5432/stackoverflow"
-connection_pool = ConnectionPool(db_url, num_workers=2, open=False)
+connection_pool = AsyncConnectionPool(db_url, num_workers=2, open=False)
 
 @asynccontextmanager
 async def db_connection_as_lifespan(app: FastAPI):
-    connection_pool.open()
+    await connection_pool.open()
     yield
-    connection_pool.close()
+    await connection_pool.close()
