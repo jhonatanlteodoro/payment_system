@@ -27,14 +27,25 @@ class Post:
         data["post_type_id"] = PostType(data["post_type_id"])
         return data
 
+@dataclass
+class PostOvertime:
+    week: datetime
+    count: int
+
+@dataclass
+class PostTagOvertime:
+    week: datetime
+    tag: str
+    count: int
+
 class PostsQuery:
 
     def __init__(self, db):
         self.db = db
         self.cachedQueries = dict()
 
-    def _execute_query(self, query, query_args, multiple_objects=False):
-        return execute_query(self.db, query, query_args, db_data_factory(Post), multiple_objects)
+    def _execute_query(self, query, query_args, multiple_objects=False, factory_item_class: any = Post):
+        return execute_query(self.db, query, query_args, db_data_factory(factory_item_class), multiple_objects)
 
     def get_posts(self, page=1, page_limit=10):
         query = '''
@@ -50,3 +61,40 @@ class PostsQuery:
             SELECT * FROM posts WHERE id = %s LIMIT 1
         '''
         return self._execute_query(query, (post_id,))
+
+    async def get_post_count_overtime(self, start_date: datetime, end_date: datetime):
+        string_start = start_date.strftime('%Y-%m-%d')
+        string_end = end_date.strftime('%Y-%m-%d')
+        query = '''
+        with filteredByDate AS (
+            SELECT DATE_TRUNC('week', creation_date) AS week
+            FROM posts
+                WHERE creation_date >= %s AND creation_date <= %s
+        )
+        
+        SELECT week, count(*) FROM filteredByDate
+            GROUP BY week ORDER BY week;
+        '''
+        return self._execute_query(query, (string_start, string_end), multiple_objects=True, factory_item_class=PostOvertime)
+
+    async def get_tags_count_withing_posts_overtime(self, start_date: datetime, end_date: datetime):
+        string_start = start_date.strftime('%Y-%m-%d')
+        string_end = end_date.strftime('%Y-%m-%d')
+        query = '''
+        with filteredByDate AS (
+            SELECT DATE_TRUNC('week', creation_date) AS week, tags
+            FROM posts
+                WHERE creation_date >= %s AND creation_date <= %s
+                AND tags != ''
+                AND LENGTH(TRIM(tags)) > 0
+            ),
+            tagsWithinDate AS (
+                SELECT week, TRIM(unnest(string_to_array(tags, '|'))) AS tag
+                FROM filteredByDate
+            )
+        SELECT week, tag, count(*)
+        FROM tagsWithinDate WHERE tag != ''
+        GROUP BY week, tag
+        ORDER BY week DESC;
+        '''
+        return self._execute_query(query, (string_start, string_end), multiple_objects=True, factory_item_class=PostTagOvertime)

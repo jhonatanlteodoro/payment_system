@@ -1,4 +1,4 @@
-import enum
+from datetime import datetime, timedelta
 
 from fastapi import Depends, APIRouter, Request
 from ariadne import QueryType, make_executable_schema, InterfaceType, load_schema_from_path, EnumType
@@ -43,28 +43,67 @@ def resolve_node_type(obj, info, *args):
     return None
 
 @query.field("listPosts")
-def resolve_list_posts(_, info):
+async def resolve_list_posts(_, info):
     container = info.context["container"]
     data = [post.to_graphql_data() for post in container.get_instance(PostsQueryInterface).get_posts()]
     return {"success": True, "error": "", "data": data}
 
 @query.field("getPost")
-def resolve_get_post(_, info, id: str):
+async def resolve_get_post(_, info, id: str):
     container = info.context["container"]
     data = container.get_instance(PostsQueryInterface).get_post(int(id))
     return {"success": True, "error": "", "data": data.to_graphql_data()}
 
 @query.field("listVotes")
-def resolve_list_votes(_, info):
+async def resolve_list_votes(_, info):
     container = info.context["container"]
     data = [post.to_graphql_data() for post in container.get_instance(VotesQueryInterface).get_votes()]
     return {"success": True, "error": "", "data": data}
 
 @query.field("getVote")
-def resolve_get_vote(_, info, id: str):
+async def resolve_get_vote(_, info, id: str):
     container = info.context["container"]
     data = container.get_instance(VotesQueryInterface).get_vote(int(id))
     return {"success": True, "error": "", "data": data.to_graphql_data()}
+
+
+def requested_fields(info):
+    selections = info.field_nodes[0].selection_set.selections
+    fields = {selection.name.value for selection in selections}
+    return fields
+
+@query.field("postsHistogram")
+async def resolve_posts_overtime(_, info, start_date: str, end_date: str):
+    container = info.context["container"]
+
+    start = datetime.fromisoformat(start_date)
+    end = datetime.fromisoformat(end_date)
+
+    if start > end or end - start > timedelta(days=30*6):
+        return {"success": False, "errors": ["Start date must be before end date and range maximum 6 months."]}
+
+    data = {
+        "success": False,
+        "errors": [],
+    }
+    fields = requested_fields(info)
+    for field in fields:
+        if field == "created_overtime":
+            try:
+                data[field] = [item.__dict__ for item in await container.get_instance(PostsQueryInterface).get_post_count_overtime(start, end)]
+                continue
+            except Exception as e:
+                print(e)
+                data["errors"].append("failed to get post creation overtime")
+
+        if field == "most_used_tags_overtime":
+            try:
+                data[field] = [item.__dict__ for item in await container.get_instance(PostsQueryInterface).get_tags_count_withing_posts_overtime(start, end)]
+            except Exception as e:
+                print(e)
+                data["errors"].append("failed to get users tags overtime")
+
+    return data
 
 def get_context_value(request: Request, _data) -> dict:
     return {
