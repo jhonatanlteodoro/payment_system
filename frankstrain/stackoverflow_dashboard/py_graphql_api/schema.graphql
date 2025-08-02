@@ -140,6 +140,26 @@ type Vote implements Node {
     creation_date: String!
 }
 
+type PostCreationOverTime {
+    week: String!
+    count: Int!
+}
+
+type MostUsedTagsOvertime {
+    week: String
+    tag: String!
+    count: Int!
+}
+
+type PostHistogram {
+    # from query result
+    success: Boolean!
+    errors: [String!]
+
+    created_overtime: [PostCreationOverTime!]
+    most_used_tags_overtime: [MostUsedTagsOvertime!]
+}
+
 
 type Query {
     """
@@ -161,5 +181,11 @@ type Query {
     Retrieves a specific vote by its unique identifier
     """
     getVote(id: ID!): SingleObjectQueryResult!
+
+    postsHistogram(
+        start_date: String!
+        end_date: String!
+        post_type: PostType
+    ): PostHistogram!
 
 }
