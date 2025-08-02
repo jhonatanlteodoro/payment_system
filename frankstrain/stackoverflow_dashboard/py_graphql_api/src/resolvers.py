@@ -6,6 +6,7 @@ from ariadne.asgi import GraphQL
 
 from src.data.posts import PostType
 from src.data.votes import VoteType
+from src.post_histogram import PostHistogram
 from src.types.container import ContainerInterface
 from src.types.votes import VotesQueryInterface
 from src.types.posts import PostsQueryInterface
@@ -72,44 +73,40 @@ def requested_fields(info):
     fields = {selection.name.value for selection in selections}
     return fields
 
-@query.field("postsHistogram")
-async def resolve_posts_overtime(_, info, start_date: str, end_date: str):
-    container = info.context["container"]
+def get_post_histogram():
+    return PostHistogram()
 
-    start = datetime.fromisoformat(start_date)
-    end = datetime.fromisoformat(end_date)
+@query.field("postsHistogram")
+async def resolve_posts_overtime(_, info, start_date: str, end_date: str, ):
+    container = info.context["container"]
+    post_histogram = info.context["post_histogram"]
+    data = post_histogram.get_response_shape()
+
+    try:
+        start = datetime.fromisoformat(start_date)
+        end = datetime.fromisoformat(end_date)
+    except Exception as e:
+        print(e)
+        data["errors"].append("invalid date format. Expected YYYY-MM-DD")
+        return data
 
     if start > end or end - start > timedelta(days=30*6):
-        return {"success": False, "errors": ["Start date must be before end date and range maximum 6 months."]}
+        data["errors"].append("Start date must be before end date and range maximum 6 months[6*30days].")
+        return data
 
-    data = {
-        "success": False,
-        "errors": [],
-    }
     fields = requested_fields(info)
-    for field in fields:
-        if field == "created_overtime":
-            try:
-                data[field] = [item.__dict__ for item in await container.get_instance(PostsQueryInterface).get_post_count_overtime(start, end)]
-                continue
-            except Exception as e:
-                print(e)
-                data["errors"].append("failed to get post creation overtime")
-
-        if field == "most_used_tags_overtime":
-            try:
-                data[field] = [item.__dict__ for item in await container.get_instance(PostsQueryInterface).get_tags_count_withing_posts_overtime(start, end)]
-            except Exception as e:
-                print(e)
-                data["errors"].append("failed to get users tags overtime")
-
-    return data
+    return await post_histogram.run(fields, container.get_instance(PostsQueryInterface), start, end)
 
 def get_context_value(request: Request, _data) -> dict:
-    return {
+    ctx = {
         "request": request,
         "container": request.scope["container"],
     }
+
+    if _data.get("operationName") == "PostsHistogram":
+        ctx["post_histogram"] = get_post_histogram()
+
+    return ctx
 
 
 router = APIRouter(
